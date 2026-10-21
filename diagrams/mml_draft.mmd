@@ -1,0 +1,81 @@
+classDiagram
+    %% PawPal+ draft UML. Update to match the final implementation.
+
+    class Owner {
+        +str name
+        +Preferences preferences
+        +list~Pet~ pets
+        +add_pet(pet) None
+        +remove_pet(pet) None
+        +get_all_tasks() list~tuple~Pet, Task~~
+    }
+
+    class Preferences {
+        +time day_start
+        +time day_end
+        +list~str~ preferred_categories
+        +int max_task_minutes
+        +available_minutes() int
+    }
+
+    class Pet {
+        +str name
+        +str species
+        +int age
+        +str notes
+        +list~Task~ tasks
+        +add_task(task) None
+        +remove_task(task) None
+    }
+
+    class Task {
+        +str name
+        +str description
+        +int duration_minutes
+        +str priority
+        +str category
+        +bool completed
+        +mark_complete() None
+    }
+
+    class Scheduler {
+        +Owner owner
+        +generate_plan(plan_date) DailyPlan
+        -rank_tasks(pairs) list~tuple~Pet, Task~~
+        -fits_constraints(task, minutes_remaining) bool
+        -explain(task, scheduled, minutes_remaining) str
+    }
+
+    class DailyPlan {
+        +date date
+        +list~ScheduledTask~ scheduled
+        +list~SkippedTask~ skipped
+        +total_minutes() int
+        +summary() str
+    }
+
+    class ScheduledTask {
+        +Task task
+        +Pet pet
+        +time start_time
+        +time end_time
+        +str reason
+    }
+
+    class SkippedTask {
+        +Task task
+        +Pet pet
+        +str reason
+    }
+
+    Owner "1" *-- "0..*" Pet : has
+    Owner "1" *-- "1" Preferences : has
+    Pet "1" *-- "0..*" Task : needs
+    Scheduler --> Owner : plans for
+    Scheduler ..> DailyPlan : creates
+    DailyPlan "1" *-- "0..*" ScheduledTask : contains
+    DailyPlan "1" *-- "0..*" SkippedTask : contains
+    ScheduledTask --> Task
+    ScheduledTask --> Pet
+    SkippedTask --> Task
+    SkippedTask --> Pet

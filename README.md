@@ -53,6 +53,9 @@ Paste a sample of your app's CLI or Streamlit output here so a reader can see wh
 #   09:00 — Feeding (10 min) [priority: high]
 #   ...
 ```
+Plan for 2026-10-20 (45 min scheduled)
+  08:00-08:15  Whiskers: Feed Whiskers [medium] - medium priority, 15 min
+  08:15-08:45  Buddy: Walk Buddy [low] - low priority, 30 min
 
 ## 🧪 Testing PawPal+
 
