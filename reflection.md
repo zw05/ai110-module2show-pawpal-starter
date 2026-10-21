@@ -55,13 +55,13 @@
 - How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
 - What kinds of prompts or questions were most helpful?
 
-    - Design brainstorming, 
+    - Design brainstorming - I added a context.md file for the ai to read and I added the behavior and some core requirements that I put. I also asked it to suggest some other features. 
 
 **b. Judgment and verification**
 
 - Describe one moment where you did not accept an AI suggestion as-is.
 - How did you evaluate or verify what the AI suggested?
-
+    - When it added some additional classes such as priority which I really didnt see was needed. 
 ---
 
 ## 4. Testing and Verification
