@@ -70,11 +70,16 @@
 
 - What behaviors did you test?
 - Why were these tests important?
+    - I tested the sort order by priority order, then duration
+    - Tasks sit back to back from teh start of the day
+    - empty plans
+    - and duplicates
 
 **b. Confidence**
 
 - How confident are you that your scheduler works correctly?
 - What edge cases would you test next if you had more time?
+    My confidence level is a 4
 
 ---
 
@@ -83,11 +88,14 @@
 **a. What went well**
 
 - What part of this project are you most satisfied with?
+    - the overall logic and the implementation of the scheduler
 
 **b. What you would improve**
 
 - If you had another iteration, what would you improve or redesign?
+    - the UI
 
 **c. Key takeaway**
 
 - What is one important thing you learned about designing systems or working with AI on this project?
+    - even though this project was small, I learned about the actual workflow of a engineer.

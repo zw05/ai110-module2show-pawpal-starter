@@ -96,12 +96,37 @@ Confidence Level - 4
 
 ## 📸 Demo Walkthrough
 
-Describe your app in numbered steps so a reader can follow along without watching a video:
+Run the app with `streamlit run app.py`.
 
-1. <!-- Describe this step -->
-2. <!-- Describe this step -->
-3. <!-- Describe this step -->
-4. <!-- Describe this step -->
-5. <!-- Add more steps as needed -->
+### Main UI features
+
+| Section | What you can do |
+|---------|-----------------|
+| **Owner** | Edit the owner name (the day runs 08:00-18:00 by default). |
+| **Pets** | Enter a name, species (dog, cat, other) and age, then click **Add pet**. All pets are listed below the form. |
+| **Tasks** | Pick a pet, enter a title, duration (1-240 min), priority (low, medium, high) and category (walk, feeding, medication, enrichment, grooming, other), then click **Add task**. A table shows every task across all pets. |
+| **Build Schedule** | Click **Generate schedule** to see today's plan, with a reason for each task and a list of skipped tasks. |
+
+### Example workflow
+
+1. Open the app and set the owner name.
+2. Add a pet, e.g. **Buddy** (dog, age 4), then add a second pet, e.g. **Whiskers** (cat, age 2).
+3. With Buddy selected, add the task **Walk Buddy**: 30 min, low priority, category walk.
+4. Select Whiskers and add **Feed Whiskers**: 15 min, medium priority, category feeding.
+5. Click **Generate schedule** and read today's plan:
+
+```
+Plan for 2026-10-20 (45 min scheduled)
+  08:00-08:15  Whiskers: Feed Whiskers [medium] - medium priority, 15 min
+  08:15-08:45  Buddy: Walk Buddy [low] - low priority, 30 min
+```
+
+### Key Scheduler behaviors shown
+
+- **Sorting:** tasks from all pets are merged and ranked by priority (high first), then shorter duration, then name. In the example above, the medium-priority feeding comes before the low-priority walk even though it was added second.
+- **Back-to-back placement:** tasks are placed one after another from the start of the day, so scheduled tasks never overlap.
+- **Skipping with a reason:** a task that does not fit in the remaining time (or exceeds the max task length) is listed under *Skipped* with an explanation, and later, shorter tasks can still be scheduled.
+- **Completed tasks are left out** of the plan.
+- **Not implemented:** conflict warnings, duplicate flagging and recurring tasks. Duplicate tasks are currently both scheduled without a warning.
 
 **Screenshot or video** *(optional)*: <!-- Insert a screenshot or link to a demo video here -->

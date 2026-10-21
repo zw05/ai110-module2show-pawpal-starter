@@ -1,5 +1,5 @@
 classDiagram
-    %% PawPal+ draft UML. Update to match the final implementation.
+    %% PawPal+ UML, matching the final implementation in pawpal_system.py.
 
     class Owner {
         +str name
@@ -14,7 +14,7 @@ classDiagram
         +time day_start
         +time day_end
         +list~str~ preferred_categories
-        +int max_task_minutes
+        +int~None~ max_task_minutes
         +available_minutes() int
     }
 
@@ -28,6 +28,8 @@ classDiagram
         +remove_task(task) None
     }
 
+    note for Task "priority must be high, medium or low (PRIORITY_ORDER); duration_minutes must be > 0"
+
     class Task {
         +str name
         +str description
@@ -35,15 +37,16 @@ classDiagram
         +str priority
         +str category
         +bool completed
+        +__post_init__() None
         +mark_complete() None
     }
 
     class Scheduler {
         +Owner owner
         +generate_plan(plan_date) DailyPlan
-        -rank_tasks(pairs) list~tuple~Pet, Task~~
-        -fits_constraints(task, minutes_remaining) bool
-        -explain(task, scheduled, minutes_remaining) str
+        -_rank_tasks(pairs) list~tuple~Pet, Task~~
+        -_fits_constraints(task, minutes_remaining) bool
+        -_explain(task, scheduled, minutes_remaining) str
     }
 
     class DailyPlan {
@@ -73,6 +76,9 @@ classDiagram
     Pet "1" *-- "0..*" Task : needs
     Scheduler --> Owner : plans for
     Scheduler ..> DailyPlan : creates
+    Scheduler ..> ScheduledTask : creates
+    Scheduler ..> SkippedTask : creates
+    Scheduler ..> Preferences : reads via owner
     DailyPlan "1" *-- "0..*" ScheduledTask : contains
     DailyPlan "1" *-- "0..*" SkippedTask : contains
     ScheduledTask --> Task
