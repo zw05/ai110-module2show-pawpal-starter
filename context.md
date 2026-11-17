@@ -13,7 +13,7 @@ A busy pet owner needs help staying consistent with pet care. They want an assis
 # Project Scope
 
 Do not add authentication logic, a database layer, or any features not described 
-in the spec.
+in the spec, except the "Ask PawPal" RAG care Q&A feature (see RAG_FEATURE.md).
 # Requirements: UML Diagram
 
 A user class storing:

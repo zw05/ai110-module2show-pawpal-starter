@@ -1,7 +1,10 @@
 from datetime import time
+from pathlib import Path
 
 import streamlit as st
 from pawpal_system import Pet, Task, Owner, Preferences, Scheduler
+from rag import Retriever, load_chunks
+from ai_helper import NOT_CONFIGURED, ask
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
@@ -130,3 +133,41 @@ if st.button("Generate schedule"):
         st.text(plan.summary())
     else:
         st.warning("Nothing to schedule. Add a pet and some tasks first.")
+
+st.divider()
+
+st.subheader("Ask PawPal")
+st.caption("Pet-care questions answered from our care guides. General guidance, not veterinary advice.")
+
+
+@st.cache_resource
+def get_retriever():
+    return Retriever(load_chunks(Path(__file__).parent / "knowledge"))
+
+
+ask_pet = None
+if owner.pets:
+    ask_index = st.selectbox(
+        "About which pet?",
+        options=[None] + list(range(len(owner.pets))),
+        format_func=lambda i: "Any pet" if i is None else owner.pets[i].name,
+        key="ask_pet",
+    )
+    if ask_index is not None:
+        ask_pet = owner.pets[ask_index]
+
+question = st.text_input("Your question", placeholder="How much exercise does a senior dog need?")
+if st.button("Ask") and question.strip():
+    with st.spinner("Looking through the care guides..."):
+        answer, hits = ask(question, get_retriever(), pet=ask_pet)
+    if answer == NOT_CONFIGURED:
+        st.info(NOT_CONFIGURED + " Showing the most relevant guide passages instead.")
+        if not hits:
+            st.write("I don't have guidance on that yet.")
+    else:
+        st.write(answer)
+    if hits:
+        with st.expander("Sources", expanded=answer == NOT_CONFIGURED):
+            for chunk, score in hits:
+                st.markdown(f"**{chunk.source}** - {chunk.heading} (score {score:.1f})")
+                st.text(chunk.text)

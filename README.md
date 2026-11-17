@@ -130,3 +130,15 @@ Plan for 2026-10-20 (45 min scheduled)
 - **Not implemented:** conflict warnings, duplicate flagging and recurring tasks. Duplicate tasks are currently both scheduled without a warning.
 
 **Screenshot or video** *(optional)*: <!-- Insert a screenshot or link to a demo video here -->
+
+## Ask PawPal (RAG care Q&A)
+
+Ask a pet-care question in the app and get an answer grounded in the guides in `knowledge/`, with sources shown. See `RAG_FEATURE.md`.
+
+```bash
+pip install -r requirements.txt
+cp .env.example .env            # then put your Gemini key in .env
+streamlit run app.py
+```
+
+Without a key the app still runs and Ask PawPal shows an "AI is not configured" message. Out-of-scope questions get "I don't have guidance on that" without calling the model.
