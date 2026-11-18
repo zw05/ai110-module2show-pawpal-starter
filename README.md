@@ -1,119 +1,77 @@
-# PawPal+ (Module 2 Project)
+# PawPal+ with Ask PawPal
 
-You are building **PawPal+**, a Streamlit app that helps a pet owner plan care tasks for their pet.
+## Original project
 
-## Scenario
+This project extends **PawPal+**, the Streamlit pet-care planner I built in Modules 1-3. PawPal+ let an owner enter their pets and care tasks (walks, feeding, meds, grooming) with a duration, priority and category. It then generated a daily schedule and explained why each task was placed or skipped. Its goals were to turn a busy owner's task list into a realistic plan, and to keep that logic correct and testable.
 
-A busy pet owner needs help staying consistent with pet care. They want an assistant that can:
+## Title and summary
 
-- Track pet care tasks (walks, feeding, meds, enrichment, grooming, etc.)
-- Consider constraints (time available, priority, owner preferences)
-- Produce a daily plan and explain why it chose that plan
+**PawPal+ with Ask PawPal** keeps the scheduler and adds a retrieval-augmented (RAG) care assistant, saved data and a dashboard UI.
 
-Your job is to design the system first (UML), then implement the logic in Python, then connect it to the Streamlit UI.
+Owners can ask questions such as "How much exercise does a senior dog need?" or "Is Mochi's walk long enough?". Answers come from a set of curated care guides in `knowledge/` and from the owner's own pets, tasks and today's plan. Every answer cites its sources. This matters because generic chatbots give inconsistent, ungrounded pet advice. Here the model may only answer from the passages it is given, and it says "I don't know" when it has nothing relevant.
 
-## What you will build
+## Architecture overview
 
-Your final app should:
+```mermaid
+flowchart LR
+    UI[Streamlit UI<br/>app.py] -->|add pets / tasks| OWN[Owner, Pet, Task<br/>pawpal_system.py]
+    OWN <-->|save / load| STO[(data/owner.json<br/>storage.py)]
+    OWN --> SCH[Scheduler<br/>rank + place tasks] --> PLAN[DailyPlan<br/>scheduled + skipped + reasons]
+    PLAN --> UI
 
-- Let a user enter basic owner + pet info
-- Let a user add/edit tasks (duration + priority at minimum)
-- Generate a daily schedule/plan based on constraints and priorities
-- Display the plan clearly (and ideally explain the reasoning)
-- Include tests for the most important scheduling behaviors
-
-## Getting started
-
-### Setup
-
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+    UI -->|question + selected pet| ASK[ai_helper.ask]
+    KB[(knowledge/*.md)] --> RET[rag.py<br/>chunk + BM25 retriever]
+    ASK -->|query + species/age| RET
+    RET -->|top 3 guide passages| ASK
+    OWN -->|live pets, tasks, plan| CTX[owner_context]
+    CTX --> ASK
+    ASK -->|passages + question| LLM[Gemini]
+    LLM -->|cited answer| ASK
+    ASK -->|answer + only the cited sources| UI
 ```
 
-### Suggested workflow
+- **Scheduler path:** the UI edits an `Owner` containing `Pet`s and `Task`s. `Scheduler.generate_plan()` ranks tasks (priority, then shorter duration, then name) and places them back to back from the start of the day. Tasks that don't fit go into a skipped list with a reason. `storage.py` saves the owner to `data/owner.json`.
+- **RAG path:** `rag.py` splits each guide into one chunk per `##` section and ranks chunks with an in-memory BM25 index. `ai_helper.py` adds the selected pet's species and age to the query, retrieves the top 3 passages, and appends a freshly built description of the owner's data. It sends all of that to Gemini with a system prompt that forces grounded, cited answers. The UI then shows only the sources the answer actually cites.
+- **Guardrails:** a minimum retrieval score, a "don't know" instruction, no-key and API-error fallbacks that never crash the app, and a vet referral for medical questions.
 
-1. Read the scenario carefully and identify requirements and edge cases.
-2. Draft a UML diagram (classes, attributes, methods, relationships).
-3. Convert UML into Python class stubs (no logic yet).
-4. Implement scheduling logic in small increments.
-5. Add tests to verify key behaviors.
-6. Connect your logic to the Streamlit UI in `app.py`.
-7. Refine UML so it matches what you actually built.
+## Setup instructions
 
-## 🖥️ Sample Output
+1. Clone the repo and open a terminal in it.
+2. Create and activate a virtual environment:
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate      # Windows: .venv\Scripts\activate
+   ```
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. Add your Gemini API key (optional, only needed for Ask PawPal answers):
+   ```bash
+   cp .env.example .env           # then edit .env: GEMINI_API_KEY=your-key
+   ```
+5. Run the app:
+   ```bash
+   streamlit run app.py
+   ```
+6. Run the tests (no key or network needed):
+   ```bash
+   pytest
+   ```
 
-Paste a sample of your app's CLI or Streamlit output here so a reader can see what a generated plan looks like:
+Without a key, the scheduler works normally and Ask PawPal shows "AI is not configured".
 
-```
-# e.g.:
-# Daily plan for Biscuit (Golden Retriever):
-#   08:00 — Morning walk (30 min) [priority: high]
-#   09:00 — Feeding (10 min) [priority: high]
-#   ...
-```
-Plan for 2026-10-20 (45 min scheduled)
-  08:00-08:15  Whiskers: Feed Whiskers [medium] - medium priority, 15 min
-  08:15-08:45  Buddy: Walk Buddy [low] - low priority, 30 min
-
-## 🧪 Testing PawPal+
-
-```bash
-# Run the full test suite:
-pytest
-
-# Run with coverage:
-pytest --cov
-```
-
-Sample test output:
-
-```
-# Paste your pytest output here
-```
-==================== test session starts =====================
-platform win32 -- Python 3.12.10, pytest-9.1.1, pluggy-1.7.0
-rootdir: C:\Users\darkn\Projects\school\ai110-module2show-pawpal-starter
-plugins: anyio-4.15.1
-collected 7 items                                             
-
-tests\test_pawpal.py .......                            [100%]
-
-===================== 7 passed in 0.05s ======================
-Confidence Level - 4
-
-## 📐 Smarter Scheduling
-
-> Fill in once you've implemented scheduling logic.
-
-| Feature | Method(s) | Notes |
-|---------|-----------|-------|
-| Task sorting | | e.g., by priority, duration |
-| Filtering | | e.g., skip tasks if time runs out |
-| Conflict handling | | e.g., overlapping time slots |
-| Recurring tasks | | e.g., daily vs. weekly |
-
-## 📸 Demo Walkthrough
-
-Run the app with `streamlit run app.py`.
-
-### Main UI features
+## Using the app
 
 | Section | What you can do |
 |---------|-----------------|
 | **Owner** | Edit the owner name (the day runs 08:00-18:00 by default). |
-| **Pets** | Enter a name, species (dog, cat, other) and age, then click **Add pet**. All pets are listed below the form. |
-| **Tasks** | Pick a pet, enter a title, duration (1-240 min), priority (low, medium, high) and category (walk, feeding, medication, enrichment, grooming, other), then click **Add task**. A table shows every task across all pets. |
-| **Build Schedule** | Click **Generate schedule** to see today's plan, with a reason for each task and a list of skipped tasks. |
+| **Pets** | Add a pet with name, species and age. |
+| **Tasks** | Pick a pet, then add a task with a title, duration (1-240 min), priority and category. |
+| **Build Schedule** | Generate today's plan, with a reason for each task and a list of skipped tasks. |
+| **Ask PawPal** | Ask a care question, optionally for one of your pets, and get a cited answer. |
 
-### Example workflow
-
-1. Open the app and set the owner name.
-2. Add a pet, e.g. **Buddy** (dog, age 4), then add a second pet, e.g. **Whiskers** (cat, age 2).
-3. With Buddy selected, add the task **Walk Buddy**: 30 min, low priority, category walk.
-4. Select Whiskers and add **Feed Whiskers**: 15 min, medium priority, category feeding.
-5. Click **Generate schedule** and read today's plan:
+Example plan output:
 
 ```
 Plan for 2026-10-20 (45 min scheduled)
@@ -121,24 +79,64 @@ Plan for 2026-10-20 (45 min scheduled)
   08:15-08:45  Buddy: Walk Buddy [low] - low priority, 30 min
 ```
 
-### Key Scheduler behaviors shown
+Scheduler behaviors: tasks from all pets are merged and ranked by priority, then shorter duration, then name. Tasks are placed back to back so they never overlap. A task that doesn't fit, or exceeds the max task length, is skipped with a reason, and later shorter tasks can still be scheduled. Completed tasks are left out. Conflict warnings and recurring tasks are not implemented.
 
-- **Sorting:** tasks from all pets are merged and ranked by priority (high first), then shorter duration, then name. In the example above, the medium-priority feeding comes before the low-priority walk even though it was added second.
-- **Back-to-back placement:** tasks are placed one after another from the start of the day, so scheduled tasks never overlap.
-- **Skipping with a reason:** a task that does not fit in the remaining time (or exceeds the max task length) is listed under *Skipped* with an explanation, and later, shorter tasks can still be scheduled.
-- **Completed tasks are left out** of the plan.
-- **Not implemented:** conflict warnings, duplicate flagging and recurring tasks. Duplicate tasks are currently both scheduled without a warning.
+## Sample interactions
 
-**Screenshot or video** *(optional)*: <!-- Insert a screenshot or link to a demo video here -->
+These are real outputs from the app (model `gemini-3.5-flash-lite`). The saved owner is Jordan, who has one dog, Mochi (1 year old), with a single 20-minute "Morning walk".
 
-## Ask PawPal (RAG care Q&A)
+**1. General care question**
 
-Ask a pet-care question in the app and get an answer grounded in the guides in `knowledge/`, with sources shown. See `RAG_FEATURE.md`.
+> **Q:** How much exercise does a senior dog need?
+>
+> **A:** Hi there! Senior dogs still need daily walks, but they should be shorter and gentler [senior-pets.md]. You can try two or three 15 to 20 minute walks a day instead of one long one, while avoiding hard running or jumping [senior-pets.md]. For anything medical or urgent, please contact a vet!
+>
+> *Top retrieved passage:* `senior-pets.md` / "Exercise for senior dogs" (BM25 score 7.1)
 
-```bash
-pip install -r requirements.txt
-cp .env.example .env            # then put your Gemini key in .env
-streamlit run app.py
-```
+**2. Another guide, different species**
 
-Without a key the app still runs and Ask PawPal shows an "AI is not configured" message. Out-of-scope questions get "I don't have guidance on that" without calling the model.
+> **Q:** How often should I groom a cat?
+>
+> **A:** How often you should groom a cat depends on their coat:
+> - Short-haired cats need brushing about once a week [cat-care.md].
+> - Long-haired cats need brushing every day or two to prevent mats [cat-care.md].
+
+**3. Question that combines the owner's data with the guides**
+
+> **Q:** Is Mochi's walk long enough? *(Mochi selected)*
+>
+> **A:** Mochi is a 1-year-old dog [your-pawpal-data]. According to the care guides, most adult dogs need 30 to 60 minutes of exercise per day, usually split into two or more walks [dog-exercise.md]. Mochi currently has 1 task(s), 20 minutes in total scheduled (Morning walk: 20 min) [your-pawpal-data]. Since this is less than the general recommendation of 30 to 60 minutes, you may want to adjust.
+
+**4. Out-of-scope question (guardrail)**
+
+> **Q:** What is the capital of France?
+>
+> **A:** I don't know.
+>
+> Retrieval returns no passages for this question. With no pets saved the app short-circuits to "I don't have guidance on that yet" without calling the model. Here the owner's data was still sent, so the model was called and declined to answer.
+
+## Design decisions and trade-offs
+
+- **Retrieval over fine-tuning or a bare LLM.** Grounding answers in `knowledge/` makes them traceable and easy to correct (edit a markdown file). The cost is that the assistant only knows what the guides contain.
+- **BM25 instead of embeddings or a vector database.** The guides are small, so keyword search is fast, runs offline and is easy to test. The trade-off is that it misses synonyms. For "How often should I groom a cat?" the best-ranked chunk is `senior-pets.md` (score 2.4), ahead of the cat grooming section (1.9).
+- **Owner data is injected, not retrieved.** It is small, and building it fresh from the live `Owner` on every question means it can't go stale. Totals are precomputed so the model quotes them instead of doing arithmetic. The system prompt still requires care advice to come from the guides, never from the owner's data alone.
+- **Show only cited sources.** Keyword retrieval can surface loosely related chunks, so the UI lists only the sources the answer cites. This is more honest than displaying every hit.
+- **Never crash.** A missing key or API error returns a friendly message, so the scheduler keeps working. This costs some visibility into failures.
+- **Scheduler stays simple and deterministic.** Priority first, then time. It ignores owner preferences when ranking, because a predictable plan is easier to explain and test. The trade-off is that preferences don't influence the order.
+- **JSON persistence.** One file, no database. This is fine for a single-user app.
+
+## Testing summary
+
+- **25 automated tests pass** (`pytest`, about 0.3 s, fully offline).
+  - `test_pawpal.py`: sort order (priority, then duration), back-to-back placement, empty plans, duplicates, skipped tasks.
+  - `test_rag.py`: chunking, BM25 ranking, out-of-scope queries returning nothing, the cited-sources filter, and answer generation with the Gemini client mocked.
+  - `test_storage.py`: save/load round trip, and a missing or corrupt file returning `None`.
+- **What worked:** mocking the Gemini client let the whole RAG pipeline be tested without a key. The minimum-score cutoff reliably rejects off-topic questions at the retrieval stage.
+- **What didn't:** keyword retrieval can rank the wrong chunk first (the cat-grooming query above). Duplicate tasks are scheduled without a warning, and conflict detection and recurring tasks are not implemented. Live model replies can't be unit tested, so I checked them by hand. I also saw the model open answers with filler greetings and repeat the vet disclaimer, which the prompt doesn't fully prevent.
+- **Learned:** retrieval quality limits answer quality more than the model does, so the tests that matter most are the ones on retrieval and on the "I don't know" path. My confidence in the scheduler is 4/5.
+
+## Reflection
+
+Building this showed me that adding AI to an app is mostly an engineering problem around the model, not the model itself. Chunking, ranking, thresholds, prompts and fallbacks decide whether the answers are trustworthy. Constraining the model to cited passages mattered more than choosing a clever prompt. Starting from a small, tested scheduler also gave me a stable base to attach the AI feature to without breaking it.
+
+The graded responsible-AI reflection is in `model_card.md`. See also `reflection.md` (design and AI-collaboration notes) and `RAG_FEATURE.md` (feature spec).
