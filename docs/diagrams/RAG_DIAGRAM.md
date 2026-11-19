@@ -22,8 +22,8 @@ flowchart TD
     end
 
     subgraph Owner["Owner data (live, never retrieved)"]
-        ASK --> OC["owner_context(owner)<br/>pets, tasks, today's schedule<br/>as 'your-pawpal-data' chunks"]
-        OD[("Owner / Pets / Tasks<br/>storage.py")] -.-> OC
+        ASK --> OC["owner_context(owner)<br/>pets, tasks, today's schedule<br/>as 'Your PawPal data' chunks"]
+        OD[("Owner / Pets / Tasks<br/>pawpal/storage.py")] -.-> OC
         OC -.-> SCH["Scheduler.generate_plan()"]
     end
 

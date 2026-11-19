@@ -5,12 +5,12 @@ This keeps the data in a file so it survives reloads and restarts.
 """
 
 import json
-from datetime import time
+from datetime import date, time
 from pathlib import Path
 
-from pawpal_system import Owner, Pet, Preferences, Task
+from .pawpal_system import Owner, Pet, Preferences, Task
 
-DEFAULT_PATH = Path(__file__).parent / "data" / "owner.json"
+DEFAULT_PATH = Path(__file__).parent.parent / "data" / "owner.json"
 
 
 def owner_to_dict(owner: Owner) -> dict:
@@ -29,6 +29,7 @@ def owner_to_dict(owner: Owner) -> dict:
                 "species": p.species,
                 "age": p.age,
                 "notes": p.notes,
+                "vet_visits": [d.isoformat() for d in p.vet_visits],
                 "tasks": [
                     {
                         "name": t.name,
@@ -37,6 +38,7 @@ def owner_to_dict(owner: Owner) -> dict:
                         "priority": t.priority,
                         "category": t.category,
                         "completed": t.completed,
+                        "completed_on": t.completed_on.isoformat() if t.completed_on else None,
                     }
                     for t in p.tasks
                 ],
@@ -59,7 +61,11 @@ def owner_from_dict(data: dict) -> Owner:
     )
     for p in data.get("pets", []):
         pet = Pet(name=p["name"], species=p["species"], age=p["age"], notes=p.get("notes", ""))
+        pet.vet_visits = [date.fromisoformat(d) for d in p.get("vet_visits", [])]
         for t in p.get("tasks", []):
+            t = dict(t)
+            if t.get("completed_on"):
+                t["completed_on"] = date.fromisoformat(t["completed_on"])
             pet.add_task(Task(**t))
         owner.add_pet(pet)
     return owner

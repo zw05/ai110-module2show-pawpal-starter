@@ -1,11 +1,11 @@
-from datetime import time
+from datetime import date, time
 from pathlib import Path
 
 import streamlit as st
-from pawpal_system import Pet, Task, Owner, Preferences, Scheduler
-from rag import Retriever, load_chunks
-from ai_helper import NOT_CONFIGURED, OWNER_SOURCE, ask, cited_passages, owner_context
-from storage import load_owner, save_owner
+from pawpal.pawpal_system import Pet, Task, Owner, Preferences, Scheduler
+from pawpal.rag import Retriever, load_chunks
+from pawpal.ai_helper import NOT_CONFIGURED, OWNER_SOURCE, ask, cited_passages, owner_context, strip_citations
+from pawpal.storage import load_owner, save_owner
 
 st.set_page_config(page_title="PawPal+", layout="wide",
                    initial_sidebar_state="expanded")
@@ -15,20 +15,20 @@ st.markdown(
 <style>
 .block-container {padding-top: 2rem; max-width: 1100px;}
 .hero {
-    background: linear-gradient(135deg, #ff9a5a 0%, #ff6b8b 100%);
-    border-radius: 16px; padding: 1.5rem 1.75rem; margin-bottom: 1.25rem; color: white;
+    background: #3f4650;
+    border-radius: 16px; padding: 1.5rem 1.75rem; margin-bottom: 1.25rem; color: #f2f2f2;
 }
-.hero h1 {margin: 0; font-size: 2.2rem; color: white;}
-.hero p {margin: .25rem 0 0; opacity: .95;}
+.hero h1 {margin: 0; font-size: 2.2rem; color: #f2f2f2;}
+.hero p {margin: .25rem 0 0; opacity: .85;}
 .pet-chip {
     display: inline-block; padding: .3rem .8rem; margin: 0 .4rem .4rem 0;
-    border-radius: 999px; background: #fff1e8; color: #b34a12; font-weight: 600;
-    border: 1px solid #ffd2b8;
+    border-radius: 999px; background: #eceeef; color: #3f4650; font-weight: 600;
+    border: 1px solid #d3d6d9;
 }
 .badge {display:inline-block; padding:.1rem .6rem; border-radius:999px; font-size:.8rem; font-weight:600;}
-.badge-high {background:#ffe0e0; color:#b00020;}
-.badge-medium {background:#fff3cd; color:#8a6100;}
-.badge-low {background:#e0f2e9; color:#1b6b3a;}
+.badge-high {background:#3f4650; color:#f2f2f2;}
+.badge-medium {background:#c4c8cc; color:#2b2f35;}
+.badge-low {background:#eceeef; color:#5b626a;}
 div.stButton > button {border-radius: 10px; font-weight: 600;}
 </style>
 <div class="hero">
@@ -70,23 +70,23 @@ def page_dashboard():
     m3.metric("High priority", high)
     m4.metric("Scheduled minutes", plan.total_minutes() if plan else 0)
 
-    left, right = st.columns([3, 2])
+    left, right = st.columns([5, 2])
     with left:
         st.markdown("### Today's schedule")
         if plan and plan.scheduled:
-            st.dataframe(
-                width="stretch",
-                hide_index=True,
-                data=[
-                    {
-                        "time": f"{i.start_time:%H:%M}-{i.end_time:%H:%M}",
-                        "pet": i.pet.name,
-                        "task": i.task.name,
-                        "priority": i.task.priority,
-                    }
-                    for i in plan.scheduled
-                ],
-            )
+            widths = [2.6, 1.8, 3, 1.8, 1.6]
+            for col, label in zip(st.columns(widths), ["Time", "Pet", "Task", "Priority", ""]):
+                col.caption(label)
+            for n, item in enumerate(plan.scheduled):
+                c_time, c_pet, c_task, c_pri, c_btn = st.columns(widths)
+                c_time.write(f"{item.start_time:%H:%M}-{item.end_time:%H:%M}")
+                c_pet.write(item.pet.name)
+                c_task.write(item.task.name)
+                c_pri.write(item.task.priority)
+                c_btn.button(
+                    "Done", key=f"dash_done_{n}", width="stretch",
+                    on_click=item.pet.complete_task, args=(item.task,),
+                )
             if plan.skipped:
                 st.warning(f"{len(plan.skipped)} task(s) did not fit in the day. See the Schedule page.")
         else:
@@ -120,6 +120,24 @@ def page_pets():
         owner.add_pet(Pet(name=pet_name, species=species, age=int(age)))
 
     if owner.pets:
+        st.markdown("### Vet visits")
+        vcol1, vcol2 = st.columns(2)
+        with vcol1:
+            vi = st.selectbox(
+                "Pet", options=range(len(owner.pets)), format_func=lambda i: owner.pets[i].name,
+                key="vet_pet",
+            )
+        with vcol2:
+            visit_date = st.date_input("Visit date", value=date.today())
+        if st.button("Log vet visit"):
+            owner.pets[vi].vet_visits.append(visit_date)
+        vp = owner.pets[vi]
+        if vp.last_vet_visit():
+            st.caption(
+                f"Last visit {vp.last_vet_visit()} - next checkup due {vp.next_vet_due()}"
+            )
+
+    if owner.pets:
         st.markdown(
             "".join(f'<span class="pet-chip">{p.name} - {p.age}y</span>' for p in owner.pets),
             unsafe_allow_html=True,
@@ -148,7 +166,7 @@ def page_tasks():
         priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
     with col4:
         category = st.selectbox(
-            "Category", ["walk", "feeding", "medication", "enrichment", "grooming", "other"]
+            "Category", ["walk", "feeding", "medication", "enrichment", "grooming", "vet", "other"]
         )
 
     if st.button("Add task"):
@@ -164,20 +182,23 @@ def page_tasks():
 
     all_tasks = owner.get_all_tasks()
     if all_tasks:
-        st.dataframe(
-            width="stretch",
-            hide_index=True,
-            data=[
-                {
-                    "pet": pet.name,
-                    "task": task.name,
-                    "minutes": task.duration_minutes,
-                    "priority": task.priority,
-                    "category": task.category,
-                }
-                for pet, task in all_tasks
-            ],
-        )
+        widths = [2, 3, 1, 1, 2, 2]
+        for col, label in zip(st.columns(widths), ["Pet", "Task", "Min", "Priority", "Category", ""]):
+            col.caption(label)
+        for i, (pet, task) in enumerate(all_tasks):
+            c_pet, c_task, c_min, c_pri, c_cat, c_btn = st.columns(widths)
+            c_pet.write(pet.name)
+            c_task.write(f"~~{task.name}~~" if task.completed else task.name)
+            c_min.write(task.duration_minutes)
+            c_pri.write(task.priority)
+            c_cat.write(task.category)
+            if task.completed:
+                c_btn.button("Undo", key=f"undo_{i}", on_click=pet.reopen_task, args=(task,))
+            else:
+                c_btn.button(
+                    "Mark done", key=f"done_{i}",
+                    on_click=pet.complete_task, args=(task,),
+                )
     else:
         st.info("No tasks yet. Add one above.")
 
@@ -233,7 +254,7 @@ def page_ask():
             if not hits:
                 st.write("I don't have guidance on that yet.")
         else:
-            st.write(answer)
+            st.write(strip_citations(answer))
         # Without AI there is no answer to cite, so show the best-matching guides.
         # With AI, show only the sources the answer actually cites.
         if answer == NOT_CONFIGURED:

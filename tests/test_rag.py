@@ -3,9 +3,9 @@ from types import SimpleNamespace
 
 import pytest
 
-import ai_helper
-from pawpal_system import Pet
-from rag import Retriever, load_chunks
+from pawpal import ai_helper
+from pawpal.pawpal_system import Pet
+from pawpal.rag import Retriever, load_chunks
 
 KNOWLEDGE = Path(__file__).parent.parent / "knowledge"
 
@@ -103,7 +103,7 @@ def test_api_error_returns_friendly_message(retriever):
 def make_owner():
     from datetime import time
 
-    from pawpal_system import Owner, Preferences, Task
+    from pawpal.pawpal_system import Owner, Preferences, Task
 
     owner = Owner(name="Sam", preferences=Preferences(time(8, 0), time(18, 0)))
     rex = Pet(name="Rex", species="dog", age=12)
@@ -118,7 +118,7 @@ def test_owner_context_reflects_current_data():
     owner = make_owner()
     text = "\n".join(c.text for c in ai_helper.owner_context(owner))
     assert "Rex is a 12-year-old dog" in text
-    assert "2 task(s), 30 minutes in total" in text
+    assert "2 tasks, 30 minutes in total" in text
     assert "Morning walk" in text and "Tilly" in text
     assert "Plan for" in text  # today's schedule chunk
     assert all(c.source == ai_helper.OWNER_SOURCE for c in ai_helper.owner_context(owner))
@@ -128,7 +128,7 @@ def test_owner_context_reflects_current_data():
 
 
 def test_owner_context_empty_without_pets():
-    from pawpal_system import Owner, Preferences
+    from pawpal.pawpal_system import Owner, Preferences
     from datetime import time
 
     assert ai_helper.owner_context(Owner("Sam", Preferences(time(8), time(18)))) == []
@@ -170,3 +170,26 @@ def test_cited_passages_only_returns_what_the_answer_cites(retriever):
 
     # Answer cites nothing: nothing shown.
     assert ai_helper.cited_passages("I don't know.", hits, owner_chunks) == []
+
+
+def test_strip_citations_removes_source_tags():
+    text = "Walk daily [dog-exercise.md]. Mochi has 1 task [Your PawPal data], see [a.md, b.md]."
+    assert ai_helper.strip_citations(text) == "Walk daily. Mochi has 1 task, see."
+    assert ai_helper.strip_citations("Keep [note] this") == "Keep [note] this"
+
+
+def test_rate_limit_gets_friendly_message():
+    from pawpal.ai_helper import RATE_LIMITED, answer_question
+    from pawpal.rag import Chunk
+
+    class Boom(Exception):
+        code = 429
+
+    class Models:
+        def generate_content(self, **kw):
+            raise Boom()
+
+    class Client:
+        models = Models()
+
+    assert answer_question("q", [Chunk("a.md", "h", "t")], client=Client()) == RATE_LIMITED

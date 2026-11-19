@@ -1,6 +1,6 @@
 from datetime import time
 
-from pawpal_system import Owner, Pet, Preferences, Scheduler, Task
+from pawpal.pawpal_system import Owner, Pet, Preferences, Scheduler, Task
 
 
 if __name__ == "__main__":

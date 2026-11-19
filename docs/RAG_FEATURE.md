@@ -15,8 +15,8 @@ The answer comes from our own guides, so it is grounded and traceable. It also u
 
 ## What gets added
 - `knowledge/*.md`: short care guides (dog exercise, feeding, cat care, senior pets, grooming, medication)
-- `rag.py`: loads the guides and finds the best-matching passages (BM25, no network)
-- `ai_helper.py`: sends the passages and question to Gemini and returns a cited answer
+- `pawpal/rag.py`: loads the guides and finds the best-matching passages (BM25, no network)
+- `pawpal/ai_helper.py`: sends the passages and question to Gemini and returns a cited answer
 - `app.py`: the new "Ask PawPal" section and a sources expander
 - `tests/test_rag.py`: offline tests, with the Gemini client mocked
 

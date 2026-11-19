@@ -14,12 +14,12 @@ Owners can ask questions such as "How much exercise does a senior dog need?" or 
 
 ```mermaid
 flowchart LR
-    UI[Streamlit UI<br/>app.py] -->|add pets / tasks| OWN[Owner, Pet, Task<br/>pawpal_system.py]
-    OWN <-->|save / load| STO[(data/owner.json<br/>storage.py)]
+    UI[Streamlit UI<br/>app.py] -->|add pets / tasks| OWN[Owner, Pet, Task<br/>pawpal/pawpal_system.py]
+    OWN <-->|save / load| STO[(data/owner.json<br/>pawpal/storage.py)]
     OWN --> SCH[Scheduler<br/>rank + place tasks] --> PLAN[DailyPlan<br/>scheduled + skipped + reasons]
     PLAN --> UI
 
-    UI -->|question + selected pet| ASK[ai_helper.ask]
+    UI -->|question + selected pet| ASK[pawpal/ai_helper.ask]
     KB[(knowledge/*.md)] --> RET[rag.py<br/>chunk + BM25 retriever]
     ASK -->|query + species/age| RET
     RET -->|top 3 guide passages| ASK
@@ -30,9 +30,26 @@ flowchart LR
     ASK -->|answer + only the cited sources| UI
 ```
 
-- **Scheduler path:** the UI edits an `Owner` containing `Pet`s and `Task`s. `Scheduler.generate_plan()` ranks tasks (priority, then shorter duration, then name) and places them back to back from the start of the day. Tasks that don't fit go into a skipped list with a reason. `storage.py` saves the owner to `data/owner.json`.
-- **RAG path:** `rag.py` splits each guide into one chunk per `##` section and ranks chunks with an in-memory BM25 index. `ai_helper.py` adds the selected pet's species and age to the query, retrieves the top 3 passages, and appends a freshly built description of the owner's data. It sends all of that to Gemini with a system prompt that forces grounded, cited answers. The UI then shows only the sources the answer actually cites.
+- **Scheduler path:** the UI edits an `Owner` containing `Pet`s and `Task`s. `Scheduler.generate_plan()` ranks tasks (priority, then shorter duration, then name) and places them back to back from the start of the day. Tasks that don't fit go into a skipped list with a reason. `pawpal/storage.py` saves the owner to `data/owner.json`.
+- **RAG path:** `pawpal/rag.py` splits each guide into one chunk per `##` section and ranks chunks with an in-memory BM25 index. `pawpal/ai_helper.py` adds the selected pet's species and age to the query, retrieves the top 5 passages, and appends a freshly built description of the owner's data. It sends all of that to Gemini with a system prompt that forces grounded, cited answers. The UI then shows only the sources the answer actually cites.
 - **Guardrails:** a minimum retrieval score, a "don't know" instruction, no-key and API-error fallbacks that never crash the app, and a vet referral for medical questions.
+
+## Project structure
+
+```
+app.py                 Streamlit UI (entry point)
+main.py                CLI demo of the scheduler
+pawpal/                Application code
+  pawpal_system.py       Owner, Pet, Task, Scheduler, DailyPlan
+  rag.py                 Guide chunking + BM25 retriever
+  ai_helper.py           Gemini prompt, owner context, cited answers
+  storage.py             JSON save/load of the owner
+knowledge/             Care guides the RAG feature searches (*.md)
+data/                  Saved owner data (owner.json, git-ignored)
+tests/                 pytest suite
+docs/                  Feature spec, RAG diagram, UML (diagrams/), context
+README.md, reflection.md, requirements.txt, .env.example
+```
 
 ## Setup instructions
 
@@ -105,7 +122,7 @@ These are real outputs from the app (model `gemini-3.5-flash-lite`). The saved o
 
 > **Q:** Is Mochi's walk long enough? *(Mochi selected)*
 >
-> **A:** Mochi is a 1-year-old dog [your-pawpal-data]. According to the care guides, most adult dogs need 30 to 60 minutes of exercise per day, usually split into two or more walks [dog-exercise.md]. Mochi currently has 1 task(s), 20 minutes in total scheduled (Morning walk: 20 min) [your-pawpal-data]. Since this is less than the general recommendation of 30 to 60 minutes, you may want to adjust.
+> **A:** Mochi is a 1-year-old dog [Your PawPal data]. According to the care guides, most adult dogs need 30 to 60 minutes of exercise per day, usually split into two or more walks [dog-exercise.md]. Mochi currently has 1 task, 20 minutes in total scheduled (Morning walk: 20 min) [Your PawPal data]. Since this is less than the general recommendation of 30 to 60 minutes, you may want to adjust.
 
 **4. Out-of-scope question (guardrail)**
 
@@ -139,4 +156,4 @@ These are real outputs from the app (model `gemini-3.5-flash-lite`). The saved o
 
 Building this showed me that adding AI to an app is mostly an engineering problem around the model, not the model itself. Chunking, ranking, thresholds, prompts and fallbacks decide whether the answers are trustworthy. Constraining the model to cited passages mattered more than choosing a clever prompt. Starting from a small, tested scheduler also gave me a stable base to attach the AI feature to without breaking it.
 
-The graded responsible-AI reflection is in `model_card.md`. See also `reflection.md` (design and AI-collaboration notes) and `RAG_FEATURE.md` (feature spec).
+The graded responsible-AI reflection is in `model_card.md`. See also `reflection.md` (design and AI-collaboration notes) and `docs/RAG_FEATURE.md` (feature spec).

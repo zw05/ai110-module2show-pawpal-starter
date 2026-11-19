@@ -1,11 +1,13 @@
 """Gemini-backed answers for Ask PawPal, grounded in retrieved passages."""
 
 import os
+import re
+from datetime import date
 
 from dotenv import load_dotenv
 
-from pawpal_system import Owner, Scheduler
-from rag import Chunk, Retriever
+from .pawpal_system import Owner, Scheduler
+from .rag import Chunk, Retriever
 
 load_dotenv()
 
@@ -13,15 +15,29 @@ MODEL = "gemini-3.5-flash-lite"
 NO_GUIDANCE = "I don't have guidance on that yet. Try rephrasing, or ask your vet."
 NOT_CONFIGURED = "AI is not configured. Set the GEMINI_API_KEY environment variable to enable Ask PawPal."
 
-OWNER_SOURCE = "your-pawpal-data"
+RATE_LIMITED = "PawPal is getting too many requests (Gemini free-tier limit). Wait a minute and ask again."
+
+OWNER_SOURCE ="Your PawPal data"
 
 SYSTEM_PROMPT = (
     "You are PawPal, a pet-care assistant. Answer ONLY using the provided passages. "
     "Cite sources inline like [dog-exercise.md]. If the passages do not answer the question, "
     "say you don't know. For anything medical or urgent, recommend contacting a vet. "
-    "Keep answers short and friendly. "
+    "Keep answers short and friendly, and start with the answer, not a greeting. "
+    "After the answer, always add a short 'Next steps' list with 1 to 3 concrete suggestions "
+    "the owner can act on, such as adding or rescheduling a task in PawPal, what to watch for, "
+    "or when to follow up. Base suggestions on the passages and the owner's own data, and "
+    "never suggest adding a task the owner already has. "
+    f"If the passages do not answer the question, reply only with: {NO_GUIDANCE} "
+    "and give no next steps. "
+    "When asked about a pet's vet visit, do not stop at the date: state when the last visit "
+    "was, when the next checkup is due and whether it is overdue. Next steps should include "
+    "booking the next visit around the due date, adding a 'vet' task in PawPal so it shows on "
+    "the schedule, and any relevant guide advice such as vaccines, dental checks or senior "
+    "screenings, or going sooner if symptoms appear. "
     f"Passages from [{OWNER_SOURCE}] describe the owner's own pets, tasks and today's schedule: "
-    "use them for questions about what the owner has planned, and quote their numbers exactly "
+    "use them for questions about what the owner has planned or when a pet last saw the vet "
+    "and is due next, and quote their numbers exactly "
     "instead of recalculating. Care advice (how much, how often, what is safe) must still come "
     "from the care guide passages, never from the owner's data alone."
 )
@@ -47,11 +63,25 @@ def owner_context(owner: Owner) -> list[Chunk]:
         lines = [f"{pet.name} is a {pet.age}-year-old {pet.species}."]
         if pet.notes:
             lines.append(f"Notes: {pet.notes}")
+        last, due = pet.last_vet_visit(), pet.next_vet_due()
+        if last:
+            days = (due - date.today()).days
+            status = f"overdue by {-days} days" if days < 0 else f"in {days} days"
+            lines.append(
+                f"Last vet visit: {last.isoformat()}. Next checkup due {due.isoformat()} "
+                f"({status}); checkups are every {pet.vet_interval_days()} days at this age."
+            )
+        else:
+            lines.append("No vet visits recorded.")
         if pet.tasks:
             total = sum(t.duration_minutes for t in pet.tasks)
-            lines.append(f"{len(pet.tasks)} task(s), {total} minutes in total:")
+            noun = "task" if len(pet.tasks) == 1 else "tasks"
+            lines.append(f"{len(pet.tasks)} {noun}, {total} minutes in total:")
             for t in pet.tasks:
-                done = "done" if t.completed else "not done"
+                if t.completed:
+                    done = f"done on {t.completed_on.isoformat()}" if t.completed_on else "done"
+                else:
+                    done = "not done"
                 lines.append(
                     f"- {t.name} ({t.category}): {t.duration_minutes} min, "
                     f"{t.priority} priority, {done}"
@@ -93,11 +123,19 @@ def answer_question(
         response = client.models.generate_content(
             model=MODEL,
             contents=build_prompt(question, owner_chunks + chunks, pet),
-            config={"system_instruction": SYSTEM_PROMPT, "max_output_tokens": 500},
+            config={"system_instruction": SYSTEM_PROMPT, "max_output_tokens": 800},
         )
         return (response.text or NO_GUIDANCE).strip()
     except Exception as exc:
+        if getattr(exc, "code", None) == 429:
+            return RATE_LIMITED
         return f"Sorry, I couldn't get an answer right now ({type(exc).__name__})."
+
+
+def strip_citations(answer: str) -> str:
+    """Remove inline [source] tags for display; the Sources panel shows them instead."""
+    tag = r"\s*\[(?:[^\[\]]*\.md|" + re.escape(OWNER_SOURCE) + r")\]"
+    return re.sub(tag, "", answer).strip()
 
 
 def cited_passages(answer: str, hits, owner_chunks):
@@ -112,7 +150,7 @@ def cited_passages(answer: str, hits, owner_chunks):
     return cited
 
 
-def ask(question: str, retriever: Retriever, pet=None, client=None, k: int = 3, owner=None):
+def ask(question: str, retriever: Retriever, pet=None, client=None, k: int = 5, owner=None):
     """Retrieve care guides, add the owner's live data, then answer.
 
     Returns (answer, retrieved guide (chunk, score) pairs). Owner data is always

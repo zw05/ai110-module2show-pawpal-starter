@@ -1,4 +1,4 @@
-from pawpal_system import Pet, Task
+from pawpal.pawpal_system import Pet, Task
 
 
 def test_mark_complete_changes_task_status():
@@ -34,7 +34,7 @@ def test_adding_task_to_pet_increases_task_count():
 
 from datetime import date, time
 
-from pawpal_system import Owner, Preferences, Scheduler
+from pawpal.pawpal_system import Owner, Preferences, Scheduler
 
 
 def _plan(*tasks, day_end=time(18, 0)):
@@ -87,3 +87,16 @@ def test_duplicate_tasks_are_not_flagged_yet():
     plan = _plan(_task("Walk", 30), _task("Walk", 30))
     assert [s.task.name for s in plan.scheduled] == ["Walk", "Walk"]
     assert plan.skipped == []
+
+
+def test_vet_visit_next_due_and_context():
+    from datetime import date, timedelta
+    from pawpal.ai_helper import owner_context
+
+    pet = Pet(name="Mochi", species="dog", age=3)
+    assert pet.next_vet_due() is None
+    pet.vet_visits.append(date.today() - timedelta(days=400))
+    assert pet.next_vet_due() == pet.last_vet_visit() + timedelta(days=365)
+    owner = Owner(name="Sam", preferences=Preferences(day_start=time(8, 0), day_end=time(18, 0)))
+    owner.add_pet(pet)
+    assert "overdue by 35 days" in owner_context(owner)[0].text

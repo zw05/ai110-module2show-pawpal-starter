@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import date, time
+from datetime import date, time, timedelta
 
 PRIORITY_ORDER = {"high": 3, "medium": 2, "low": 1}
 
@@ -22,6 +22,7 @@ class Task:
     priority: str
     category: str
     completed: bool = False
+    completed_on: date | None = None
 
     def __post_init__(self) -> None:
         """Normalize priority and reject invalid priority or duration values."""
@@ -33,9 +34,10 @@ class Task:
         if self.duration_minutes <= 0:
             raise ValueError("duration_minutes must be positive")
 
-    def mark_complete(self) -> None:
-        """Mark this task as completed."""
+    def mark_complete(self, on: date | None = None) -> None:
+        """Mark this task as completed, recording the date (default today)."""
         self.completed = True
+        self.completed_on = on or date.today()
 
 
 @dataclass(eq=False)
@@ -47,10 +49,39 @@ class Pet:
     age: int
     notes: str = ""
     tasks: list[Task] = field(default_factory=list)
+    vet_visits: list[date] = field(default_factory=list)
+
+    def vet_interval_days(self) -> int:
+        """Days between checkups: monthly for young pets, 6 months for seniors, else yearly."""
+        if self.age < 1:
+            return 30
+        if self.age >= 7:
+            return 182
+        return 365
+
+    def last_vet_visit(self) -> date | None:
+        return max(self.vet_visits) if self.vet_visits else None
+
+    def next_vet_due(self) -> date | None:
+        last = self.last_vet_visit()
+        return last + timedelta(days=self.vet_interval_days()) if last else None
 
     def add_task(self, task: Task) -> None:
         """Add a task to this pet's task list."""
         self.tasks.append(task)
+
+    def complete_task(self, task: Task, on: date | None = None) -> None:
+        """Complete a task. A completed "vet" task also logs a vet visit on that date."""
+        task.mark_complete(on)
+        if task.category == "vet" and task.completed_on not in self.vet_visits:
+            self.vet_visits.append(task.completed_on)
+
+    def reopen_task(self, task: Task) -> None:
+        """Undo a completion, and remove the vet visit it logged."""
+        if task.category == "vet" and task.completed_on in self.vet_visits:
+            self.vet_visits.remove(task.completed_on)
+        task.completed = False
+        task.completed_on = None
 
     def remove_task(self, task: Task) -> None:
         """Remove a task from this pet's task list."""

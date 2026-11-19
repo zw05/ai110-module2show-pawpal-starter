@@ -1,7 +1,7 @@
 from datetime import time
 
-from pawpal_system import Owner, Pet, Preferences, Task
-from storage import load_owner, save_owner
+from pawpal.pawpal_system import Owner, Pet, Preferences, Task
+from pawpal.storage import load_owner, save_owner
 
 
 def make_owner():

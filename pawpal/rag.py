@@ -12,7 +12,8 @@ from pathlib import Path
 STOPWORDS = {
     "a", "an", "and", "are", "as", "at", "be", "by", "do", "does", "for", "from",
     "how", "i", "in", "is", "it", "my", "of", "on", "or", "should", "that", "the",
-    "to", "what", "when", "with", "your", "you",
+    "to", "what", "when", "with", "your", "you", "who", "which", "where", "why",
+    "can", "could", "would", "will", "if", "so", "also",
 }
 
 
@@ -23,10 +24,31 @@ class Chunk:
     text: str
 
 
+# Everyday words an owner might use mapped to the terms the guides use.
+SYNONYMS = {
+    "dentist": ["dental", "teeth", "vet"],
+    "doctor": ["vet"],
+    "veterinarian": ["vet"],
+    "tooth": ["teeth", "dental"],
+    "poop": ["stool"],
+    "pee": ["urinate"],
+}
+
+
+def _stem(word: str) -> str:
+    """Crude stemming: drop a plural 's' or an 'ing' ending (training -> train)."""
+    if len(word) > 5 and word.endswith("ing"):
+        return word[:-3]
+    if len(word) > 3 and word.endswith("s"):
+        return word[:-1]
+    return word
+
+
 def tokenize(text: str) -> list[str]:
-    """Lowercase words with stopwords removed and a crude plural strip."""
+    """Lowercase words with stopwords removed and crude stemming."""
     words = re.findall(r"[a-z0-9]+", text.lower())
-    return [w[:-1] if len(w) > 3 and w.endswith("s") else w for w in words if w not in STOPWORDS]
+    words = [x for w in words for x in [w, *SYNONYMS.get(w, [])]]
+    return [_stem(w) for w in words if w not in STOPWORDS]
 
 
 def load_chunks(directory) -> list[Chunk]:
